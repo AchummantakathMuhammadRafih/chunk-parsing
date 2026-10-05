@@ -51,6 +51,10 @@ class ConversionConfig(BaseModel):
     )
     
     # Output artifact generation flags
+    capture_header: bool = Field(
+        default=True,
+        description="Elevate first header to top level (#) if needed using high-quality markdown parser."
+    )
     dump_md: bool = Field(
         default=True,
         description="Produce Markdown (.md) document."

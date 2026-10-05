@@ -1,5 +1,4 @@
-## 12 Conducting the Test
-
+# 12 Conducting the Test
 ![](images/4f5caa847143d63bccf77136754902695aa7e7e217163a5985af97d4918767df.jpg)
 
 ## What Is the Value of Pilot Testing?
@@ -368,8 +367,7 @@ Accordingly, you need to recognize (but not necessarily be paralyzed by) the und
 
 ![](images/41c817360117d2873f264d008cf35c6e71b6686c1ac4e3661b155134dcb259bc.jpg)
 
-# Are There Times When the Testing Staff Should Be All Female or All Male?
-
+## Are There Times When the Testing Staff Should Be All Female or All Male?
 ![](images/f4a69bcfd5604ee9e883d9611e74150371db6c13e2f58be206c8933976c7abff.jpg)  
 all-male or all-female team conduct the test.
 
@@ -397,8 +395,7 @@ You can be less concerned about using a mixed-gender team when dealing with medi
 
 We recognize that due to a number of reasons—project budget, schedule, and staff member experience among them—you might not be able to have an all-female or all-male team conduct a test of a gender-specific medical device. If this is the case, we recommend telling test participants during recruitment that someone of the opposite sex will be conducting the research and asking them if they will be comfortable responding to background questions and discussing some potentially sensitive device- and treatment-related topics. When the test participant arrives for his or her scheduled session, reiterate the usability test administration dynamics and ensure that the individual is comfortable participating. Then, if at all possible, have at least one member of the team be the same gender as the test participant.
 
-# Should User Interface Designers Conduct Usability Tests of Their Own Designs?
-
+## Should User Interface Designers Conduct Usability Tests of Their Own Designs?
 ![](images/a98fc0250b8eef6a0c8b7f2d51b2d2958ffadaad1c784cdcecb4798e6e61e114.jpg)
 
 There is no prohibition against user interface designers conducting usability tests of their own designs, presuming that they have the expertise and objectivity to do so. That said, having designers test their own work may sacrifice face validity. This is unfortunate because user interface designers can bring in-depth knowledge to a usability testing effort and might even conduct a more effective device evaluation than “outsiders” who have a more superficial knowledge of the given interaction design issues of the device.

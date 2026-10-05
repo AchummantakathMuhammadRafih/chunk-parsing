@@ -1,13 +1,13 @@
 {
   "document_name": "UsabilityTestingOfMedicalDevices_2014-Ch12",
   "status": "success",
-  "duration_seconds": 186.58,
+  "duration_seconds": 256.55,
   "pages": {
     "total": 40,
     "processed": 40
   },
   "extracted_content": {
-    "characters": 85531,
+    "characters": 85529,
     "words": 13218,
     "headings": 24,
     "paragraphs": 0,
@@ -16,7 +16,7 @@
     "images": 26
   },
   "storage": {
-    "total_output_size_bytes": 15997997,
+    "total_output_size_bytes": 15998680,
     "total_output_size_human": "15.26 MB"
   },
   "primary_files": {

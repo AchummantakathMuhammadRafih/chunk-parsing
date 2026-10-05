@@ -93,6 +93,7 @@ def cli():
 @click.option("--no-layout-pdf", is_flag=True, default=False, help="Skip generating annotated layout PDF.")
 @click.option("--no-span-pdf", is_flag=True, default=False, help="Skip generating annotated span PDF.")
 @click.option("--no-manifest", is_flag=True, default=False, help="Skip writing manifest/summary JSON files.")
+@click.option("--capture-header/--no-capture-header", default=True, show_default=True, help="Elevate first heading to top level (#) if needed.")
 @click.option("-u", "--server-url", type=str, default=None, help="URL for remote VLM/hybrid server.")
 @docling_options
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose debug logging.")
@@ -111,6 +112,7 @@ def convert_cmd(
     no_layout_pdf: bool,
     no_span_pdf: bool,
     no_manifest: bool,
+    capture_header: bool,
     server_url: Optional[str],
     no_docling: bool,
     docling_url: str,
@@ -139,6 +141,7 @@ def convert_cmd(
         draw_layout_bbox=not no_layout_pdf,
         draw_span_bbox=not no_span_pdf,
         generate_manifest=not no_manifest,
+        capture_header=capture_header,
         server_url=server_url,
         docling_enable=not no_docling,
         docling_url=docling_url,
@@ -182,6 +185,7 @@ def convert_cmd(
     help="Parsing mode (auto, txt, ocr)."
 )
 @click.option("-l", "--lang", type=str, default="ch", show_default=True, help="Language code for OCR.")
+@click.option("--capture-header/--no-capture-header", default=True, show_default=True, help="Elevate first heading to top level (#) if needed.")
 @click.option("--stop-on-error", is_flag=True, default=False, help="Halt batch conversion on first error.")
 @docling_options
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose debug logging.")
@@ -193,6 +197,7 @@ def batch_cmd(
     backend: str,
     method: str,
     lang: str,
+    capture_header: bool,
     stop_on_error: bool,
     no_docling: bool,
     docling_url: str,
@@ -226,6 +231,7 @@ def batch_cmd(
         backend=BackendType(backend),
         method=ParseMethod(method),
         lang=lang,
+        capture_header=capture_header,
         docling_enable=not no_docling,
         docling_url=docling_url,
         docling_max_tokens=docling_max_tokens,

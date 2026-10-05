@@ -17,7 +17,7 @@ from mineru_converter.exporters.manifest import (
     calculate_document_stats,
     write_manifest_and_summary,
 )
-from mineru_converter.exporters.postprocessor import create_standard_aliases
+from mineru_converter.exporters.postprocessor import create_standard_aliases, normalize_markdown_headers
 from mineru_converter.models.enums import BackendType, ParseMethod
 from mineru_converter.models.schemas import BatchSummary, ConversionResult, OutputFileManifest
 from mineru_converter.utils.file_utils import ensure_directory, sanitize_filename
@@ -188,10 +188,14 @@ class MinerUConverter:
             doc_stem=doc_stem
         )
 
+        # 6. Normalize Markdown headers if requested (elevate first header to top H1 level)
+        if cfg.capture_header and manifest.markdown_path and manifest.markdown_path.exists():
+            normalize_markdown_headers(manifest.markdown_path)
+
         elapsed = time.time() - start_time
         end_dt = datetime.utcnow()
 
-        # 6. Calculate statistics
+        # 7. Calculate statistics
         stats = calculate_document_stats(
             manifest=manifest,
             input_file=pdf_file,

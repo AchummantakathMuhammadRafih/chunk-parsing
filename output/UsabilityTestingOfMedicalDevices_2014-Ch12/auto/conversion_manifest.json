@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-10-01T10:54:30.585244Z",
+  "generated_at": "2026-10-05T05:17:44.778691Z",
   "document": {
     "name": "UsabilityTestingOfMedicalDevices_2014-Ch12",
     "input_file": "C:\\Users\\Muhammad.Rafih\\Code\\chunk_parsing\\input\\UsabilityTestingOfMedicalDevices_2014-Ch12.pdf",
@@ -10,7 +10,7 @@
   "conversion": {
     "backend": "pipeline",
     "method": "auto",
-    "duration_seconds": 186.58,
+    "duration_seconds": 256.55,
     "pages_total": 40,
     "pages_processed": 40
   },
@@ -61,9 +61,9 @@
   },
   "files_checksums": {
     "UsabilityTestingOfMedicalDevices_2014-Ch12.md": {
-      "size_bytes": 86077,
-      "size_human": "84.06 KB",
-      "sha256": "c07e35b355e984adb0545f4773aba89ef59af3bc24a51689c86db3db89a78fb3"
+      "size_bytes": 86760,
+      "size_human": "84.73 KB",
+      "sha256": "4483ea926f640384200b95601d32e0d07bcb06125d752cfe3ed51e24f42851ab"
     },
     "UsabilityTestingOfMedicalDevices_2014-Ch12_content_list.json": {
       "size_bytes": 191448,
@@ -98,7 +98,7 @@
     "UsabilityTestingOfMedicalDevices_2014-Ch12_origin.pdf": {
       "size_bytes": 3302150,
       "size_human": "3.15 MB",
-      "sha256": "74d66d9d980fab53d007bce2fbccf243e94e924464d9a2a4cda642f7ac6de20b"
+      "sha256": "8b04afed6587da90de43314d6f0d2c082d515226c4d39b3c23637144a3566b09"
     },
     "images\\0ffbd7bb989706df70aef4f661c24d8ee3c9e722b805f515fd70ede9c9094f04.jpg": {
       "size_bytes": 24685,

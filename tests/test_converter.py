@@ -22,6 +22,10 @@ from mineru_converter.exporters.manifest import (
     build_output_manifest,
     calculate_document_stats,
 )
+from mineru_converter.exporters.postprocessor import (
+    normalize_markdown_content,
+    normalize_markdown_headers,
+)
 from mineru_converter.models.schemas import OutputFileManifest
 from mineru_converter.utils.redaction import mask_personal_info
 from mineru_converter.utils.file_utils import (
@@ -118,6 +122,43 @@ class TestMinerUConverter(unittest.TestCase):
         self.assertIn("batch", result.output)
         self.assertIn("inspect", result.output)
         self.assertIn("info", result.output)
+
+    def test_cli_convert_help_has_capture_header(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["convert", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("--capture-header", result.output)
+
+    def test_normalize_markdown_content_h2_to_h1(self):
+        input_md = "## Chapter 1: Introduction\n\nSome text\n\n## Section 1.1\nMore text"
+        output_md, modified, msg = normalize_markdown_content(input_md)
+        self.assertTrue(modified)
+        self.assertTrue(output_md.startswith("# Chapter 1: Introduction"))
+        self.assertIn("## Section 1.1", output_md)
+
+    def test_normalize_markdown_content_leaves_top_h1(self):
+        input_md = "# Chapter 1: Introduction\n\nSome text\n\n## Section 1.1\nMore text"
+        output_md, modified, msg = normalize_markdown_content(input_md)
+        self.assertFalse(modified)
+        self.assertEqual(output_md, input_md)
+
+    def test_normalize_markdown_content_demotes_conflicting_subsequent_h1(self):
+        input_md = "## Chapter 1: Introduction\n\n# Conflicting Large Header\n\n## Normal Section"
+        output_md, modified, msg = normalize_markdown_content(input_md)
+        self.assertTrue(modified)
+        self.assertTrue(output_md.startswith("# Chapter 1: Introduction"))
+        self.assertIn("## Conflicting Large Header", output_md)
+        self.assertIn("## Normal Section", output_md)
+
+    def test_normalize_markdown_headers_in_place(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = Path(tmpdir) / "test_doc.md"
+            file_path.write_text("## 12 Conducting the Test\n\n## Section 1\n", encoding="utf-8")
+            result = normalize_markdown_headers(file_path)
+            self.assertTrue(result)
+            updated = file_path.read_text(encoding="utf-8")
+            self.assertTrue(updated.startswith("# 12 Conducting the Test"))
+            self.assertIn("## Section 1", updated)
 
 
 class TestDoclingChunks(unittest.TestCase):
