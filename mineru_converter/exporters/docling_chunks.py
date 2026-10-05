@@ -2,16 +2,18 @@
 
 import base64
 import json
+import mimetypes
 import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from mineru_converter.config.constants import IMAGE_PLACEHOLDER_PATTERN, SUFFIX_DOCLING_CHUNKS
+from mineru_converter.config.constants import DOCLING_CHUNKS_FILE_NAME, IMAGE_PLACEHOLDER_PATTERN
 from mineru_converter.config.settings import ConversionConfig
 from mineru_converter.core.docling_client import DoclingClient
 from mineru_converter.models.schemas import OutputFileManifest
 from mineru_converter.utils.logging_utils import get_logger
+from mineru_converter.utils.redaction import mask_personal_info
 
 logger = get_logger()
 
@@ -46,7 +48,9 @@ def _encode_image(base_dir: Path, img_path: Optional[str]) -> Optional[str]:
     # img_path comes from a JSON file; keep reads inside the output directory
     if root not in target.parents or not target.is_file():
         return None
-    return base64.b64encode(target.read_bytes()).decode("ascii")
+    mime_type = mimetypes.guess_type(target.name)[0] or "image/jpeg"
+    encoded = base64.b64encode(target.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def attach_images_to_chunks(
@@ -55,7 +59,7 @@ def attach_images_to_chunks(
     base_dir: Path,
 ) -> int:
     """
-    Rewrite image placeholders in each chunk's text and fill `images` with base64 strings.
+    Rewrite image placeholders in each chunk's text and fill `images` with data URLs.
 
     The Nth placeholder across all chunks maps to the Nth content-list image.
     `images` stays 1:1 with placeholders; unresolvable images are "".
@@ -114,7 +118,7 @@ def run_docling_chunking(
     manifest: OutputFileManifest,
     config: ConversionConfig,
 ) -> Tuple[Path, int, int]:
-    """Chunk the MinerU Markdown via docling-serve and write `<stem>_docling_chunks.json`."""
+    """Chunk MinerU Markdown, sanitize it, and write `docling_chunks.json`."""
     if not manifest.markdown_path or not manifest.markdown_path.exists():
         raise FileNotFoundError("Markdown output not found; cannot run Docling chunking")
     if not manifest.content_list_v1_path or not manifest.content_list_v1_path.exists():
@@ -133,7 +137,15 @@ def run_docling_chunking(
     content_images = load_content_list_images(manifest.content_list_v1_path)
     attached = attach_images_to_chunks(chunks, content_images, manifest.output_directory)
 
-    output_path = manifest.output_directory / f"{manifest.document_name}{SUFFIX_DOCLING_CHUNKS}"
+    for chunk in chunks:
+        for key in ("text", "raw_text"):
+            value = chunk.get(key)
+            if isinstance(value, str):
+                chunk[key] = mask_personal_info(value)
+        chunk.pop("doc_items", None)
+        chunk.pop("metadata", None)
+
+    output_path = manifest.output_directory / DOCLING_CHUNKS_FILE_NAME
     payload = {
         "document_name": manifest.document_name,
         "total_chunks": len(chunks),

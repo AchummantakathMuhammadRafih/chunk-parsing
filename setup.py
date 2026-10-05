@@ -13,6 +13,8 @@ setup(
         "rich>=13.0.0",
         "pydantic>=2.0.0",
         "pypdf>=3.0.0",
+        "presidio-analyzer>=2.2.0",
+        "presidio-anonymizer>=2.2.0",
     ],
     entry_points={
         "console_scripts": [

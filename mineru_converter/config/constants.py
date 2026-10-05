@@ -64,7 +64,7 @@ SUFFIX_MODEL_JSON = "_model.json"
 SUFFIX_LAYOUT_PDF = "_layout.pdf"
 SUFFIX_SPAN_PDF = "_span.pdf"
 SUFFIX_ORIGIN_PDF = "_origin.pdf"
-SUFFIX_DOCLING_CHUNKS = "_docling_chunks.json"
+DOCLING_CHUNKS_FILE_NAME = "docling_chunks.json"
 IMAGES_DIR_NAME = "images"
 MANIFEST_FILE_NAME = "conversion_manifest.json"
 

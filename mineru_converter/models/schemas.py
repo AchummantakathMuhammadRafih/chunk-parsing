@@ -31,7 +31,7 @@ class OutputFileManifest(BaseModel):
     # Meta / summary artifacts
     manifest_path: Optional[Path] = Field(None, description="Path to generated conversion_manifest.json")
     summary_path: Optional[Path] = Field(None, description="Path to generated summary.json")
-    docling_chunks_path: Optional[Path] = Field(None, description="Path to _docling_chunks.json")
+    docling_chunks_path: Optional[Path] = Field(None, description="Path to docling_chunks.json")
 
     def all_files(self) -> List[Path]:
         """Return list of all existing generated files."""

@@ -200,6 +200,7 @@ When converting `MyDocument.pdf`, the output folder contains:
 | **Images** | `images/` | Directory containing all extracted crop images, diagrams, photos, formula renderings, and table snapshots. |
 | **Manifest** | `conversion_manifest.json` | Index of all generated files with SHA256 checksums, byte sizes, and timestamps. |
 | **Summary** | `conversion_summary.json` | High-level metrics: character count, word count, headings, tables, formulas, and duration. |
+| **Docling Chunks** | `docling_chunks.json` | Docling chunk output with personal information masked and internal chunk metadata removed. |
 
 ---
 

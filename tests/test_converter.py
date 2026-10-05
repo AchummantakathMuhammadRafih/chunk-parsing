@@ -1,21 +1,29 @@
 """Unit and integration tests for MinerU PDF Converter."""
 
 import base64
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from click.testing import CliRunner
 
 from mineru_converter.config.constants import BackendType, ParseMethod
 from mineru_converter.config.settings import ConversionConfig
 from mineru_converter.core.docling_client import DoclingClient, DoclingClientError
 from mineru_converter.core.validator import validate_pdf_document, PDFValidationError
-from mineru_converter.exporters.docling_chunks import attach_images_to_chunks, build_image_label
+from mineru_converter.exporters.docling_chunks import (
+    attach_images_to_chunks,
+    build_image_label,
+    run_docling_chunking,
+)
 from mineru_converter.exporters.manifest import (
     build_output_manifest,
     calculate_document_stats,
 )
+from mineru_converter.models.schemas import OutputFileManifest
+from mineru_converter.utils.redaction import mask_personal_info
 from mineru_converter.utils.file_utils import (
     compute_file_sha256,
     find_input_files,
@@ -151,11 +159,11 @@ class TestDoclingChunks(unittest.TestCase):
         attached = attach_images_to_chunks(chunks, images, self.base)
 
         self.assertEqual(attached, 4)
-        b64 = lambda n: base64.b64encode(n.encode()).decode()
+        data_url = lambda n: f"data:image/jpeg;base64,{base64.b64encode(n.encode()).decode()}"
         self.assertEqual(chunks[0]["text"], "Intro\n![Figure 1]")
-        self.assertEqual(chunks[0]["images"], [b64("a.jpg")])
+        self.assertEqual(chunks[0]["images"], [data_url("a.jpg")])
         self.assertEqual(chunks[1]["text"], "move\n![IMAGE]\nforward\n![Note]\n![Figure 2. Src]")
-        self.assertEqual(chunks[1]["images"], [b64("b.jpg"), b64("c.jpg"), b64("d.jpg")])
+        self.assertEqual(chunks[1]["images"], [data_url("b.jpg"), data_url("c.jpg"), data_url("d.jpg")])
         for c in chunks:
             self.assertEqual(len(c["images"]), c["text"].count("!["))
             self.assertTrue(all(isinstance(i, str) for i in c["images"]))
@@ -185,6 +193,67 @@ class TestDoclingChunks(unittest.TestCase):
         client = DoclingClient(server_url="http://127.0.0.1:1", timeout=2)
         with self.assertRaises(DoclingClientError):
             client.chunk_markdown("# hi")
+
+    def test_redactor_masks_supported_personal_info(self):
+        text = (
+            "Erin Davis, erin.davis@example.com, 212-555-0142, "
+            "123 Main Street, Boston"
+        )
+
+        masked = mask_personal_info(text)
+
+        for personal_value in (
+            "Erin Davis",
+            "erin.davis@example.com",
+            "212-555-0142",
+            "123 Main Street",
+            "Boston",
+        ):
+            self.assertNotIn(personal_value, masked)
+        self.assertIn("*", masked)
+
+    def test_export_masks_text_and_removes_internal_chunk_fields(self):
+        markdown_path = self.base / "sample.md"
+        markdown_path.write_text("# Sample", encoding="utf-8")
+        content_list_path = self.base / "sample_content_list.json"
+        content_list_path.write_text("[]", encoding="utf-8")
+        manifest = OutputFileManifest(
+            document_name="sample",
+            output_directory=self.base,
+            markdown_path=markdown_path,
+            content_list_v1_path=content_list_path,
+        )
+        chunk = {
+            "filename": "sample.md",
+            "chunk_index": 0,
+            "text": "Contact Erin Davis at erin.davis@example.com.",
+            "raw_text": "Call 212-555-0142 at 123 Main Street, Boston.",
+            "doc_items": ["#/texts/0"],
+            "metadata": {"has_image": False},
+        }
+
+        with patch("mineru_converter.exporters.docling_chunks.DoclingClient") as client_type:
+            client_type.return_value.chunk_markdown.return_value = [chunk]
+            output_path, chunk_count, attached_count = run_docling_chunking(
+                manifest,
+                ConversionConfig(),
+            )
+
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+        exported_chunk = payload["chunks"][0]
+        self.assertEqual(output_path.name, "docling_chunks.json")
+        self.assertEqual((chunk_count, attached_count), (1, 0))
+        self.assertEqual(payload["document_name"], "sample")
+        self.assertEqual(payload["total_chunks"], 1)
+        self.assertEqual(payload["total_images_attached"], 0)
+        self.assertNotIn("Erin Davis", exported_chunk["text"])
+        self.assertNotIn("erin.davis@example.com", exported_chunk["text"])
+        self.assertNotIn("212-555-0142", exported_chunk["raw_text"])
+        self.assertNotIn("123 Main Street", exported_chunk["raw_text"])
+        self.assertNotIn("Boston", exported_chunk["raw_text"])
+        self.assertNotIn("doc_items", exported_chunk)
+        self.assertNotIn("metadata", exported_chunk)
+        self.assertEqual(exported_chunk["images"], [])
 
 
 if __name__ == "__main__":
