@@ -1,0 +1,28 @@
+{
+  "document_name": "UsabilityTestingOfMedicalDevices_2014_Ch1",
+  "status": "success",
+  "duration_seconds": 133.59,
+  "pages": {
+    "total": 22,
+    "processed": 22
+  },
+  "extracted_content": {
+    "characters": 49490,
+    "words": 7361,
+    "headings": 19,
+    "paragraphs": 0,
+    "tables": 0,
+    "formulas": 0,
+    "images": 13
+  },
+  "storage": {
+    "total_output_size_bytes": 8101716,
+    "total_output_size_human": "7.73 MB"
+  },
+  "primary_files": {
+    "markdown": "C:\\Users\\Muhammad.Rafih\\Code\\chunk_parsing\\output\\UsabilityTestingOfMedicalDevices_2014_Ch1\\auto\\UsabilityTestingOfMedicalDevices_2014_Ch1.md",
+    "v1_content_list": "C:\\Users\\Muhammad.Rafih\\Code\\chunk_parsing\\output\\UsabilityTestingOfMedicalDevices_2014_Ch1\\auto\\UsabilityTestingOfMedicalDevices_2014_Ch1_content_list.json",
+    "v2_content_list": "C:\\Users\\Muhammad.Rafih\\Code\\chunk_parsing\\output\\UsabilityTestingOfMedicalDevices_2014_Ch1\\auto\\UsabilityTestingOfMedicalDevices_2014_Ch1_content_list_v2.json",
+    "middle_json": "C:\\Users\\Muhammad.Rafih\\Code\\chunk_parsing\\output\\UsabilityTestingOfMedicalDevices_2014_Ch1\\auto\\UsabilityTestingOfMedicalDevices_2014_Ch1_middle.json"
+  }
+}
