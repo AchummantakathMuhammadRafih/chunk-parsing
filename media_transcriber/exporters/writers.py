@@ -81,12 +81,30 @@ class TranscriptionWriter:
         out_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         return out_path
 
+    @staticmethod
+    def write_plain_text(result: TranscriptionResult, out_path: Path) -> Path:
+        """Write human-readable text without timestamps, mirroring .txt structure."""
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = []
+        lines.append(f"# Transcription: {Path(result.source_file).name}")
+        lines.append(f"# Media Type: {result.media_type.upper()} | Language: {result.language}")
+        if result.duration_seconds:
+            lines.append(f"# Duration: {format_timestamp_short(result.duration_seconds)}")
+        lines.append("")
+
+        for seg in result.segments:
+            lines.append(seg.text.strip())
+
+        out_path.write_text("\n".join(lines), encoding="utf-8")
+        return out_path
+
     @classmethod
     def export_all(cls, result: TranscriptionResult, output_dir: Path, base_name: str) -> Dict[str, Path]:
         """Export transcription to all supported formats."""
         output_dir.mkdir(parents=True, exist_ok=True)
         generated = {}
         generated["txt"] = cls.write_txt_with_timestamps(result, output_dir / f"{base_name}.txt")
+        generated["raw_txt"] = cls.write_plain_text(result, output_dir / f"{base_name}.raw.txt")
         generated["srt"] = cls.write_srt(result, output_dir / f"{base_name}.srt")
         generated["vtt"] = cls.write_vtt(result, output_dir / f"{base_name}.vtt")
         generated["tsv"] = cls.write_tsv(result, output_dir / f"{base_name}.tsv")

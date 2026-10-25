@@ -53,7 +53,7 @@ def cli():
     type=click.Choice([f.value for f in OutputFormat], case_sensitive=False),
     default=OutputFormat.ALL.value,
     show_default=True,
-    help="Output format: txt (timestamped), srt, vtt, json, tsv, or all."
+    help="Output format: txt (timestamped), raw_txt (plain text without timestamps), srt, vtt, json, tsv, or all."
 )
 @click.option(
     "-l", "--language",
@@ -125,6 +125,8 @@ def transcribe_cmd(
         saved_files = TranscriptionWriter.export_all(result, output_dir, base_name)
     elif output_format == OutputFormat.TXT.value:
         saved_files["txt"] = TranscriptionWriter.write_txt_with_timestamps(result, output_dir / f"{base_name}.txt")
+    elif output_format == OutputFormat.RAW_TXT.value:
+        saved_files["raw_txt"] = TranscriptionWriter.write_plain_text(result, output_dir / f"{base_name}.raw.txt")
     elif output_format == OutputFormat.SRT.value:
         saved_files["srt"] = TranscriptionWriter.write_srt(result, output_dir / f"{base_name}.srt")
     elif output_format == OutputFormat.VTT.value:
@@ -161,7 +163,7 @@ def transcribe_cmd(
     type=click.Choice([f.value for f in OutputFormat], case_sensitive=False),
     default=OutputFormat.ALL.value,
     show_default=True,
-    help="Output format: txt, srt, vtt, json, tsv, or all."
+    help="Output format: txt (timestamped), raw_txt (plain text), srt, vtt, json, tsv, or all."
 )
 @click.option(
     "-l", "--language",
@@ -217,6 +219,8 @@ def batch_cmd(
                 TranscriptionWriter.export_all(res, output_dir, base_name)
             elif output_format == OutputFormat.TXT.value:
                 TranscriptionWriter.write_txt_with_timestamps(res, output_dir / f"{base_name}.txt")
+            elif output_format == OutputFormat.RAW_TXT.value:
+                TranscriptionWriter.write_plain_text(res, output_dir / f"{base_name}.raw.txt")
             elif output_format == OutputFormat.SRT.value:
                 TranscriptionWriter.write_srt(res, output_dir / f"{base_name}.srt")
             elif output_format == OutputFormat.VTT.value:

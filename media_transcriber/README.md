@@ -38,7 +38,7 @@ Dependencies:
 Run directly as a Python module:
 
 ```bash
-# Transcribe a single MP3 or MP4 file (generates txt, srt, vtt, json, tsv)
+# Transcribe a single MP3 or MP4 file (generates txt, raw.txt, srt, vtt, json, tsv)
 python -m media_transcriber transcribe path/to/recording.mp3
 
 # Transcribe an MP4 video file to a specific output folder

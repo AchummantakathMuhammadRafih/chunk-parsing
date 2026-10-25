@@ -18,6 +18,7 @@ class WhisperModelSize(str, Enum):
 class OutputFormat(str, Enum):
     ALL = "all"
     TXT = "txt"
+    RAW_TXT = "raw_txt"
     SRT = "srt"
     VTT = "vtt"
     JSON = "json"
