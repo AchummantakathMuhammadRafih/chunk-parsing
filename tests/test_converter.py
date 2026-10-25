@@ -296,6 +296,30 @@ class TestDoclingChunks(unittest.TestCase):
         self.assertNotIn("metadata", exported_chunk)
         self.assertEqual(exported_chunk["images"], [])
 
+    def test_chunk_cli_command(self):
+        from click.testing import CliRunner
+        from mineru_converter.cli.app import cli
+
+        markdown_path = self.base / "doc.md"
+        markdown_path.write_text("# Test\nContent line", encoding="utf-8")
+        cl_path = self.base / "doc_content_list.json"
+        cl_path.write_text("[]", encoding="utf-8")
+
+        chunk = {
+            "filename": "doc.md",
+            "chunk_index": 0,
+            "text": "Content line",
+            "raw_text": "Content line",
+        }
+
+        with patch("mineru_converter.exporters.docling_chunks.DoclingClient") as client_type:
+            client_type.return_value.chunk_markdown.return_value = [chunk]
+            runner = CliRunner()
+            result = runner.invoke(cli, ["chunk", str(self.base)])
+            self.assertEqual(result.exit_code, 0)
+            self.assertTrue((self.base / "docling_chunks.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
+

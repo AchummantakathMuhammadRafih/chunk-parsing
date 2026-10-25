@@ -20,6 +20,8 @@ setup(
         "console_scripts": [
             "mineru-convert=mineru_converter.cli.app:cli",
             "mineru-converter=mineru_converter.cli.app:cli",
+            "media-transcribe=media_transcriber.cli.app:cli",
+            "media-transcriber=media_transcriber.cli.app:cli",
         ],
     },
     classifiers=[

@@ -1,6 +1,7 @@
 """Core MinerU conversion engine orchestrator."""
 
 import os
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +18,11 @@ from mineru_converter.exporters.manifest import (
     calculate_document_stats,
     write_manifest_and_summary,
 )
-from mineru_converter.exporters.postprocessor import create_standard_aliases, normalize_markdown_headers
+from mineru_converter.exporters.postprocessor import (
+    create_standard_aliases,
+    normalize_markdown_headers,
+    strip_markdown_images,
+)
 from mineru_converter.models.enums import BackendType, ParseMethod
 from mineru_converter.models.schemas import BatchSummary, ConversionResult, OutputFileManifest
 from mineru_converter.utils.file_utils import ensure_directory, sanitize_filename
@@ -182,6 +187,16 @@ class MinerUConverter:
         if actual_doc_dir is None:
             actual_doc_dir = target_root_dir / doc_stem / method_str
 
+        # If image saving is disabled, remove the extracted images folder
+        if not cfg.dump_images:
+            images_dir = actual_doc_dir / "images"
+            if images_dir.exists() and images_dir.is_dir():
+                try:
+                    shutil.rmtree(images_dir)
+                    logger.debug(f"Removed images directory: {images_dir}")
+                except Exception as rm_err:
+                    logger.warning(f"Could not remove images directory: {rm_err}")
+
         # 5. Build Artifact Manifest
         manifest = build_output_manifest(
             output_directory=actual_doc_dir,
@@ -191,6 +206,10 @@ class MinerUConverter:
         # 6. Normalize Markdown headers if requested (elevate first header to top H1 level)
         if cfg.capture_header and manifest.markdown_path and manifest.markdown_path.exists():
             normalize_markdown_headers(manifest.markdown_path)
+
+        # 7. Strip image tags from Markdown if image saving is disabled
+        if not cfg.dump_images and manifest.markdown_path and manifest.markdown_path.exists():
+            strip_markdown_images(manifest.markdown_path)
 
         elapsed = time.time() - start_time
         end_dt = datetime.utcnow()

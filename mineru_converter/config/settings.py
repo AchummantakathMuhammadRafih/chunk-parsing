@@ -51,6 +51,10 @@ class ConversionConfig(BaseModel):
     )
     
     # Output artifact generation flags
+    dump_images: bool = Field(
+        default=True,
+        description="Save extracted images to disk under images/ folder."
+    )
     capture_header: bool = Field(
         default=True,
         description="Elevate first header to top level (#) if needed using high-quality markdown parser."

@@ -36,39 +36,25 @@ A modular, production-grade CLI application and Python framework for high-fideli
 
 ```
 chunk_parsing/
-├── mineru_converter/               # Core Python Package
+├── mineru_converter/               # Core PDF Conversion Package
 │   ├── __init__.py                 # Root exports & public API
 │   ├── __main__.py                 # Entrypoint for `python -m mineru_converter`
-│   │
 │   ├── config/                     # Configuration management
-│   │   ├── __init__.py
-│   │   ├── constants.py            # Suffixes, default paths, supported languages
-│   │   └── settings.py             # Pydantic ConversionConfig schema
-│   │
 │   ├── models/                     # Data contracts and schemas
-│   │   ├── __init__.py
-│   │   ├── enums.py                # BackendType, ParseMethod, HybridEffort
-│   │   └── schemas.py              # OutputFileManifest, DocumentStats, ConversionResult
-│   │
 │   ├── core/                       # Core engine orchestrators
-│   │   ├── __init__.py
-│   │   ├── validator.py            # PDF validation, page limits & encryption checks
-│   │   └── converter.py            # MinerUConverter orchestration engine
-│   │
 │   ├── exporters/                  # Output file formatters & manifest builders
-│   │   ├── __init__.py
-│   │   ├── manifest.py             # Manifest builder, checksums & document stats
-│   │   └── postprocessor.py        # File aliases (_v1list, _v2list) & formatters
-│   │
 │   ├── utils/                      # Shared utilities
-│   │   ├── __init__.py
-│   │   ├── file_utils.py           # Path discovery, file hashing, safe names
-│   │   └── logging_utils.py        # Rich console and structured loggers
-│   │
-│   └── cli/                        # Command-Line Interface
-│       ├── __init__.py
-│       ├── formatters.py           # Rich output tables, cards, and banners
-│       └── app.py                  # Click CLI commands (convert, batch, inspect, info)
+│   └── cli/                        # Click CLI commands (convert, batch, inspect, info)
+│
+├── media_transcriber/              # Speech-to-Text Transcription Package
+│   ├── __init__.py                 # Public API (MediaTranscriber)
+│   ├── __main__.py                 # Entrypoint for `python -m media_transcriber`
+│   ├── cli/                        # CLI commands (transcribe, batch) & formatters
+│   ├── config/                     # Settings, model sizes & format enums
+│   ├── core/                       # Whisper transcription engine
+│   ├── exporters/                  # Writers for txt, srt, vtt, json, tsv
+│   ├── models/                     # Transcription segment & result dataclasses
+│   └── utils/                      # Audio format detection & logging
 │
 ├── tests/                          # Test suite
 │   └── test_converter.py           # Unit & integration tests
@@ -120,7 +106,20 @@ Inspect and review artifacts generated for a document:
 mineru-convert inspect output/results/document/auto
 ```
 
-### 6. Environment & GPU Info
+### 6. Intermediate Step: Re-chunk Directly from Markdown (`chunk`)
+If you already have MinerU outputs (Markdown, content list, and extracted images) and only want to re-run the Docling hybrid chunking step without re-parsing the PDF:
+```bash
+# Point to an output directory containing .md and _content_list.json
+mineru-convert chunk output/results/Panasonic_HD_Camera_User_Manual/auto
+
+# Or point directly to a Markdown file
+mineru-convert chunk output/results/Panasonic_HD_Camera_User_Manual/auto/Panasonic_HD_Camera_User_Manual.md
+
+# Specify custom chunking options or a different output folder
+mineru-convert chunk path/to/doc.md -o path/to/output --docling-max-tokens 512
+```
+
+### 7. Environment & GPU Info
 Display installed MinerU versions, CUDA devices, and model paths:
 ```bash
 mineru-convert info
@@ -226,6 +225,102 @@ When converting `MyDocument.pdf`, the output folder contains:
 | `--verbose` | `-v` | `False` | Enable debug logs |
 | `--quiet` | `-q` | `False` | Suppress non-error console output |
 
+### `mineru-convert chunk [OPTIONS] TARGET`
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--output` | `-o` | `None` (same as target) | Directory to write `docling_chunks.json` |
+| `--docling-url` | | `http://localhost:5001` | docling-serve base URL |
+| `--docling-max-tokens` | | `1024` | Maximum tokens per chunk |
+| `--docling-tokenizer` | | `BAAI/bge-m3` | HuggingFace tokenizer for the chunker |
+| `--docling-timeout` | | `300` | docling-serve request timeout (seconds) |
+
+---
+
+## 🎙️ Media Transcriber (`media-transcribe`)
+
+The project includes `media_transcriber`, an audio/video speech-to-text transcription module powered by OpenAI Whisper and FFmpeg. It extracts timestamps for every spoken segment and exports formatted text, subtitles, and structured data.
+
+### Supported File Formats
+`.mp3`, `.mp4`, `.wav`, `.m4a`, `.aac`, `.ogg`, `.flac`, `.mkv`, `.mov`, `.webm`, etc.
+
+### Running Media Transcriber
+
+You can run it either via the CLI command `media-transcribe` (or `media-transcriber`) or via Python module execution `python -m media_transcriber`:
+
+#### 1. Transcribe a Single File
+Transcribe an audio or video file and output all formats (`.txt`, `.srt`, `.vtt`, `.json`, `.tsv`) with timestamps:
+```bash
+# Using installed console script
+media-transcribe transcribe path/to/recording.mp3
+
+# Or via Python module
+python -m media_transcriber transcribe path/to/recording.mp3
+```
+
+#### 2. Specify Output Directory
+```bash
+media-transcribe transcribe lecture.mp4 -o output/transcriptions
+```
+
+#### 3. Select Whisper Model Size
+Choose from `tiny`, `base` (default), `small`, `medium`, `large`, `large-v3`:
+```bash
+media-transcribe transcribe interview.mp3 -m small
+```
+
+#### 4. Filter Output Formats
+Generate only specific formats: `txt`, `srt`, `vtt`, `json`, `tsv`, or `all` (default):
+```bash
+# Generate SubRip subtitles only
+media-transcribe transcribe video.mp4 -f srt
+
+# Generate timestamped text only ([00:01 -> 00:05] Hello world)
+media-transcribe transcribe video.mp4 -f txt
+```
+
+#### 5. Additional Options
+- **Word-level timestamps**:
+  ```bash
+  media-transcribe transcribe speech.mp3 --word-timestamps
+  ```
+- **Translate foreign language audio into English**:
+  ```bash
+  media-transcribe transcribe speech_es.mp3 --translate
+  ```
+- **Specify compute device (`auto`, `cpu`, `cuda`)**:
+  ```bash
+  media-transcribe transcribe meeting.wav -d cuda
+  ```
+
+#### 6. Batch Transcribe an Entire Folder
+Process an entire directory of audio/video files:
+```bash
+# Non-recursive
+media-transcribe batch input/recordings -o output/transcriptions
+
+# Recursive scan subdirectories
+media-transcribe batch input/recordings -r -o output/transcriptions
+```
+
+### Media Transcriber Python API
+
+```python
+from pathlib import Path
+from media_transcriber import MediaTranscriber
+from media_transcriber.exporters import TranscriptionWriter
+
+transcriber = MediaTranscriber(model_name="base")
+result = transcriber.transcribe(Path("audio.mp3"))
+
+# Print timestamped segments
+for segment in result.segments:
+    print(f"[{segment.start:.2f}s -> {segment.end:.2f}s]: {segment.text}")
+
+# Export all formats (txt, srt, vtt, json, tsv)
+TranscriptionWriter.export_all(result, Path("output/transcriptions"), "audio")
+```
+
 ---
 
 ## 🧪 Running Tests
@@ -234,3 +329,4 @@ Run the test suite:
 ```bash
 python -m unittest tests/test_converter.py
 ```
+

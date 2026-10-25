@@ -1,2 +1,2 @@
-docling_chunker
+media_transcriber
 mineru_converter

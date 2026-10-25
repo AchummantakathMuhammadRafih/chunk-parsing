@@ -21,6 +21,13 @@ _PLACEHOLDER_RE = re.compile(IMAGE_PLACEHOLDER_PATTERN, re.IGNORECASE)
 _PICTURE_REF_RE = re.compile(r"^#/pictures/(\d+)$")
 
 
+META_IMAGE_PATTERN = r"META\^IMG_\d+\^END"
+_META_IMAGE_RE = re.compile(META_IMAGE_PATTERN)
+_MARKDOWN_IMAGE_RE = re.compile(
+    r"!\[(.*?)\]\((images/[^)]+)\)|<img[^>]+src=[\x22\x27](images/[^\x22\x27]+)[\x22\x27][^>]*>"
+)
+
+
 def load_content_list_images(content_list_path: Path) -> List[Dict[str, Any]]:
     """Return image entries from a MinerU V1 content list in document order."""
     with open(content_list_path, "r", encoding="utf-8") as f:
@@ -51,6 +58,93 @@ def _encode_image(base_dir: Path, img_path: Optional[str]) -> Optional[str]:
     mime_type = mimetypes.guess_type(target.name)[0] or "image/jpeg"
     encoded = base64.b64encode(target.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
+
+
+def preprocess_markdown_images(
+    markdown_text: str,
+    content_images: List[Dict[str, Any]],
+    base_dir: Path,
+) -> Tuple[str, Dict[str, Dict[str, Any]]]:
+    """
+    Capture all Markdown/HTML images into a map with unique keys (META^IMG_1^END, META^IMG_2^END, ...).
+    Replaces each image reference in the text with its unique placeholder so docling-serve preserves it.
+    """
+    cl_by_path = {
+        item.get("img_path"): item
+        for item in content_images
+        if isinstance(item, dict) and item.get("img_path")
+    }
+
+    image_map: Dict[str, Dict[str, Any]] = {}
+    counter = 0
+
+    def _replace(match: re.Match) -> str:
+        nonlocal counter
+        counter += 1
+        key = f"META^IMG_{counter}^END"
+
+        # match.group(2) is markdown path, match.group(3) is html path
+        if match.group(2):
+            alt = match.group(1) or ""
+            img_path = match.group(2)
+        else:
+            alt = ""
+            img_path = match.group(3)
+
+        cl_entry = cl_by_path.get(img_path)
+        label = ""
+        if cl_entry:
+            label = build_image_label(cl_entry.get("image_caption"), cl_entry.get("image_footnote"))
+        if not label and alt.strip():
+            label = _clean_label_part(alt.strip())
+
+        image_map[key] = {
+            "img_path": img_path,
+            "label": label,
+            "data_url": _encode_image(base_dir, img_path) or "",
+        }
+        return f"\n\n{key}\n\n"
+
+    preprocessed_text = _MARKDOWN_IMAGE_RE.sub(_replace, markdown_text)
+    return preprocessed_text, image_map
+
+
+def link_images_from_map(
+    chunks: List[Dict[str, Any]],
+    image_map: Dict[str, Dict[str, Any]],
+) -> int:
+    """
+    Link images from the captured image_map back into the chunks returned by docling-serve.
+    Populates `images` list with base64 data URLs and rewrites the unique tokens to `![label]` or `![IMAGE]`.
+    """
+    attached = 0
+
+    def _make_repl():
+        def _sub(m: re.Match) -> str:
+            k = m.group(0)
+            item = image_map.get(k)
+            if not item:
+                return "![IMAGE]"
+            lbl = item["label"]
+            return f"![{lbl}]" if lbl else "![IMAGE]"
+        return _sub
+
+    for chunk in chunks:
+        chunk_images: List[str] = []
+        text = chunk.get("text") or ""
+
+        for m in _META_IMAGE_RE.finditer(text):
+            item = image_map.get(m.group(0))
+            chunk_images.append(item["data_url"] if item else "")
+
+        chunk["text"] = _META_IMAGE_RE.sub(_make_repl(), text).strip()
+        chunk["images"] = chunk_images
+        attached += sum(1 for img in chunk_images if img)
+
+        if "raw_text" in chunk and isinstance(chunk["raw_text"], str):
+            chunk["raw_text"] = _META_IMAGE_RE.sub(_make_repl(), chunk["raw_text"]).strip()
+
+    return attached
 
 
 def attach_images_to_chunks(
@@ -132,10 +226,33 @@ def run_docling_chunking(
         tokenizer=config.docling_tokenizer,
     )
     markdown_text = manifest.markdown_path.read_text(encoding="utf-8")
-    chunks = client.chunk_markdown(markdown_text, filename=manifest.markdown_path.name)
+    content_images = load_content_list_images(manifest.content_list_v1_path) if config.dump_images else []
 
-    content_images = load_content_list_images(manifest.content_list_v1_path)
-    attached = attach_images_to_chunks(chunks, content_images, manifest.output_directory)
+    # 1. Preprocess images into unique META^IMG markers before sending to docling-serve (if enabled)
+    if config.dump_images and content_images:
+        preprocessed_md, image_map = preprocess_markdown_images(
+            markdown_text=markdown_text,
+            content_images=content_images,
+            base_dir=manifest.output_directory,
+        )
+    else:
+        preprocessed_md = markdown_text
+        image_map = {}
+
+    # 2. Chunk with docling-serve
+    chunks = client.chunk_markdown(preprocessed_md, filename=manifest.markdown_path.name)
+
+    # 3. Link images from the map back into chunks (if enabled)
+    if config.dump_images:
+        if image_map:
+            attached = link_images_from_map(chunks, image_map)
+        else:
+            # Fallback to standard attachment if no markdown/html images were preprocessed
+            attached = attach_images_to_chunks(chunks, content_images, manifest.output_directory)
+    else:
+        attached = 0
+        for chunk in chunks:
+            chunk["images"] = []
 
     for chunk in chunks:
         for key in ("text", "raw_text"):

@@ -1,4 +1,5 @@
 [console_scripts]
-docling-chunk = docling_chunker.cli.app:cli
+media-transcribe = media_transcriber.cli.app:cli
+media-transcriber = media_transcriber.cli.app:cli
 mineru-convert = mineru_converter.cli.app:cli
 mineru-converter = mineru_converter.cli.app:cli

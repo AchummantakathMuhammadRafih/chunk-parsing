@@ -90,6 +90,7 @@ def cli():
 @click.option("-e", "--end-page", type=int, default=None, help="End page index (0-indexed, inclusive).")
 @click.option("--no-formula", is_flag=True, default=False, help="Disable formula/LaTeX extraction.")
 @click.option("--no-table", is_flag=True, default=False, help="Disable table structure recognition.")
+@click.option("--no-images", is_flag=True, default=False, help="Skip saving extracted images to disk under images/ folder.")
 @click.option("--no-layout-pdf", is_flag=True, default=False, help="Skip generating annotated layout PDF.")
 @click.option("--no-span-pdf", is_flag=True, default=False, help="Skip generating annotated span PDF.")
 @click.option("--no-manifest", is_flag=True, default=False, help="Skip writing manifest/summary JSON files.")
@@ -109,6 +110,7 @@ def convert_cmd(
     end_page: Optional[int],
     no_formula: bool,
     no_table: bool,
+    no_images: bool,
     no_layout_pdf: bool,
     no_span_pdf: bool,
     no_manifest: bool,
@@ -138,6 +140,7 @@ def convert_cmd(
         end_page=end_page,
         formula_enable=not no_formula,
         table_enable=not no_table,
+        dump_images=not no_images,
         draw_layout_bbox=not no_layout_pdf,
         draw_span_bbox=not no_span_pdf,
         generate_manifest=not no_manifest,
@@ -185,6 +188,7 @@ def convert_cmd(
     help="Parsing mode (auto, txt, ocr)."
 )
 @click.option("-l", "--lang", type=str, default="ch", show_default=True, help="Language code for OCR.")
+@click.option("--no-images", is_flag=True, default=False, help="Skip saving extracted images to disk under images/ folder.")
 @click.option("--capture-header/--no-capture-header", default=True, show_default=True, help="Elevate first heading to top level (#) if needed.")
 @click.option("--stop-on-error", is_flag=True, default=False, help="Halt batch conversion on first error.")
 @docling_options
@@ -197,6 +201,7 @@ def batch_cmd(
     backend: str,
     method: str,
     lang: str,
+    no_images: bool,
     capture_header: bool,
     stop_on_error: bool,
     no_docling: bool,
@@ -231,6 +236,7 @@ def batch_cmd(
         backend=BackendType(backend),
         method=ParseMethod(method),
         lang=lang,
+        dump_images=not no_images,
         capture_header=capture_header,
         docling_enable=not no_docling,
         docling_url=docling_url,
@@ -283,6 +289,94 @@ def inspect_cmd(target_dir: Path):
         stats=stats,
     )
     print_conversion_result(dummy_result)
+
+
+@cli.command("chunk")
+@click.argument("target", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "-o", "--output", "output_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Optional output directory for docling_chunks.json. Defaults to the same directory as the target."
+)
+@click.option("--docling-url", type=str, default=DEFAULT_DOCLING_URL, show_default=True, help="docling-serve base URL.")
+@click.option("--docling-max-tokens", type=click.IntRange(min=1), default=DEFAULT_DOCLING_MAX_TOKENS, show_default=True, help="Max tokens per chunk.")
+@click.option("--docling-tokenizer", type=str, default=DEFAULT_DOCLING_TOKENIZER, show_default=True, help="HuggingFace tokenizer for the hybrid chunker.")
+@click.option("--docling-timeout", type=click.IntRange(min=1), default=300, show_default=True, help="docling-serve request timeout (s).")
+def chunk_cmd(
+    target: Path,
+    output_dir: Optional[Path],
+    docling_url: str,
+    docling_max_tokens: int,
+    docling_tokenizer: str,
+    docling_timeout: int,
+):
+    """Run Docling hybrid chunking directly on an existing Markdown file or MinerU output directory."""
+    print_banner()
+
+    from mineru_converter.exporters.docling_chunks import run_docling_chunking
+    from mineru_converter.models.schemas import OutputFileManifest
+
+    if target.is_file():
+        if target.suffix.lower() != ".md":
+            console.print(f"[bold red]Target file must be a Markdown (.md) file:[/bold red] {target}")
+            sys.exit(1)
+        markdown_path = target
+        working_dir = target.parent
+        doc_stem = target.stem
+    else:
+        working_dir = target
+        doc_stem = target.name
+        if doc_stem in ("auto", "txt", "ocr", "vlm", "hybrid", "pipeline"):
+            doc_stem = target.parent.name
+        markdown_path = working_dir / f"{doc_stem}.md"
+        if not markdown_path.exists():
+            # Search for any .md file in the directory
+            md_files = list(working_dir.glob("*.md"))
+            if md_files:
+                markdown_path = md_files[0]
+                doc_stem = markdown_path.stem
+            else:
+                console.print(f"[bold red]No Markdown (.md) file found in:[/bold red] {working_dir}")
+                sys.exit(1)
+
+    content_list_path = working_dir / f"{doc_stem}_content_list.json"
+    if not content_list_path.exists():
+        cl_files = list(working_dir.glob("*_content_list.json"))
+        if cl_files:
+            content_list_path = cl_files[0]
+
+    dest_dir = output_dir or working_dir
+
+    manifest = OutputFileManifest(
+        document_name=doc_stem,
+        output_directory=dest_dir,
+        markdown_path=markdown_path,
+        content_list_v1_path=content_list_path if content_list_path.exists() else None,
+    )
+
+    config = ConversionConfig(
+        docling_url=docling_url,
+        docling_max_tokens=docling_max_tokens,
+        docling_tokenizer=docling_tokenizer,
+        docling_timeout=docling_timeout,
+    )
+
+    console.print(f"[bold cyan]Document:[/bold cyan] {doc_stem}")
+    console.print(f"[bold cyan]Markdown:[/bold cyan] {markdown_path}")
+    console.print(f"[bold cyan]Content List:[/bold cyan] {content_list_path if content_list_path.exists() else 'Not found (images will be skipped)'}")
+    console.print(f"[bold cyan]Output Directory:[/bold cyan] {dest_dir}\n")
+
+    with console.status("[bold green]Running Docling hybrid chunking & image linking..."):
+        try:
+            out_file, chunk_count, attached_count = run_docling_chunking(manifest, config)
+        except Exception as e:
+            console.print(f"[bold red]Chunking failed:[/bold red] {e}")
+            sys.exit(1)
+
+    console.print(f"[bold green]✓ Successfully generated:[/bold green] {out_file}")
+    console.print(f"[bold cyan]* Total Chunks:[/bold cyan] {chunk_count}")
+    console.print(f"[bold cyan]* Total Images Attached:[/bold cyan] {attached_count}")
 
 
 @cli.command("info")

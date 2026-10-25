@@ -110,6 +110,39 @@ def normalize_markdown_headers(markdown_path: Path) -> bool:
         return False
 
 
+def strip_markdown_images(markdown_path: Path) -> bool:
+    """
+    Remove all image references (![...](...) and <img ...>) from the Markdown file.
+    
+    Args:
+        markdown_path: Path to the .md file.
+        
+    Returns:
+        True if images were stripped, False otherwise.
+    """
+    if not markdown_path or not markdown_path.is_file():
+        return False
+
+    try:
+        content = markdown_path.read_text(encoding="utf-8")
+        # Matches ![alt](src) and <img src=...>
+        image_pattern = re.compile(
+            r"(!\[.*?\]\([^)]+\)|<img[^\>]+src=[\"'][^\"']+[\"'][^\>]*>)[ \t]*(\r?\n)?",
+            re.MULTILINE
+        )
+        new_content, count = image_pattern.subn("", content)
+        if count > 0:
+            # Clean up excessive 3+ newlines left by removed lines
+            new_content = re.sub(r"\n{3,}", "\n\n", new_content)
+            markdown_path.write_text(new_content, encoding="utf-8")
+            logger.info(f"Stripped {count} image reference(s) from {markdown_path.name}")
+            return True
+        return False
+    except Exception as exc:
+        logger.warning(f"Failed to strip images from {markdown_path.name}: {exc}")
+        return False
+
+
 def create_standard_aliases(
     manifest: OutputFileManifest,
     create_v_aliases: bool = True
