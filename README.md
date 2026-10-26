@@ -1,12 +1,16 @@
-# MinerU PDF Conversion Toolkit 📄⚡
+# MinerU Document Conversion & HTML Toolkit 📄⚡
 
-A modular, production-grade CLI application and Python framework for high-fidelity PDF document parsing and conversion using **MinerU** (`magic-pdf`).
+A modular, production-grade CLI suite and Python framework for high-fidelity document parsing, artifact extraction, and HTML generation using **MinerU** (`magic-pdf`).
+
+Supports **PDF**, **Microsoft Word (`.docx`, `.doc`)**, **PowerPoint (`.pptx`, `.ppt`)**, **Excel (`.xlsx`, `.xls`, `.csv`, `.tsv`)**, and **Audio/Video Transcription**.
 
 ---
 
 ## 🌟 Key Features
 
-- **Complete Artifact Production**: Produces all MinerU conversion files out-of-the-box:
+- **Multi-Engine Document Parsing**:
+  - Full MinerU extraction suite for PDFs (Markdown, Content Lists V1/V2, Layout JSON, Model ASTs, Annotated visual PDFs).
+  - Native conversion of **PDF, DOCX, PPTX, and XLSX** into standalone, responsive HTML with base64 embedded assets and themes.
   - 📝 **Markdown (`.md`)**: Clean, formatted text with LaTeX math and image markdown links.
   - 📋 **V1 Content List (`_content_list.json` / `_v1list.json`)**: Flat block-level element stream.
   - 📊 **V2 Content List (`_content_list_v2.json` / `_v2list.json`)**: Rich hierarchical block stream with bounding boxes and metadata.
@@ -46,6 +50,16 @@ chunk_parsing/
 │   ├── utils/                      # Shared utilities
 │   └── cli/                        # Click CLI commands (convert, batch, inspect, info)
 │
+├── mineru_html_converter/          # PDF to Semantic HTML Converter Package
+│   ├── __init__.py                 # Public API (MinerUHTMLConverter, HTMLConversionConfig)
+│   ├── __main__.py                 # Entrypoint for `python -m mineru_html_converter`
+│   ├── cli/                        # CLI commands (convert, batch) & formatters
+│   ├── config/                     # Settings, themes & render modes
+│   ├── core/                       # MinerU HTML converter engine
+│   ├── exporters/                  # Postprocessor (base64 image inlining, TOC, themes)
+│   ├── models/                     # HTML conversion result schemas
+│   └── utils/                      # Path utils & logging
+│
 ├── media_transcriber/              # Speech-to-Text Transcription Package
 │   ├── __init__.py                 # Public API (MediaTranscriber)
 │   ├── __main__.py                 # Entrypoint for `python -m media_transcriber`
@@ -56,8 +70,18 @@ chunk_parsing/
 │   ├── models/                     # Transcription segment & result dataclasses
 │   └── utils/                      # Audio format detection & logging
 │
+├── markdown_redactor/              # Markdown PII Redaction & Star-Masking Package
+│   ├── __init__.py                 # Public API (MarkdownRedactor, RedactionConfig)
+│   ├── __main__.py                 # Entrypoint for `python -m markdown_redactor`
+│   ├── cli/                        # CLI commands (redact, batch, entities) & formatters
+│   ├── config/                     # Settings & entity constants
+│   ├── core/                       # Presidio Analyzer & Anonymizer engine
+│   ├── models/                     # Finding & RedactionResult dataclasses
+│   └── utils/                      # File search & logging utils
+│
 ├── tests/                          # Test suite
-│   └── test_converter.py           # Unit & integration tests
+│   ├── test_converter.py           # Unit & integration tests
+│   └── test_html_converter.py      # HTML converter unit tests
 ├── cli.py                          # Top-level CLI launcher
 ├── setup.py                        # Package setup & console scripts
 └── pyproject.toml                  # Build configuration
@@ -323,10 +347,119 @@ TranscriptionWriter.export_all(result, Path("output/transcriptions"), "audio")
 
 ---
 
+## 🌐 MinerU Document to HTML Converter (`mineru-html`)
+
+A dedicated CLI and Python library that converts **PDF**, **DOCX**, **PPTX**, and **XLSX** documents into clean, semantic, responsive HTML powered by the MinerU engine.
+
+### Features
+- **Multi-Format Support**: Directly converts **PDF**, Microsoft Word (`.docx`, `.doc`), PowerPoint (`.pptx`, `.ppt`), and Excel (`.xlsx`, `.xls`, `.csv`, `.tsv`).
+- **Semantic Structure**: Identifies headings, paragraphs, lists, tables, code blocks, and math equations.
+- **Embedded Media (`--embed-images`)**: Encodes extracted figures directly as base64 data URIs into the HTML file for 100% portable, single-file documents.
+- **4 Built-in Themes**: `modern` (default), `dark`, `readable` (editorial book typography), and `minimal`.
+- **Interactive Floating TOC**: Injects an anchor-linked Table of Contents sidebar (`--toc`).
+- **Page Slicing & Batching**: Convert specific page ranges (e.g., `-p "1-5"`) or whole folders.
+
+### CLI Usage
+```bash
+# Convert a PDF document
+mineru-html convert document.pdf -o output/report.html
+
+# Convert a Word document (.docx)
+mineru-html convert report.docx -o output/report.html
+
+# Convert a PowerPoint presentation (.pptx)
+mineru-html convert presentation.pptx -o output/presentation.html
+
+# Convert an Excel spreadsheet (.xlsx)
+mineru-html convert financial_data.xlsx -o output/sheet.html
+
+# Run via module invocation
+python -m mineru_html_converter convert document.docx
+
+# Convert specific pages with dark theme
+mineru-html convert document.pdf -p "1-3" --theme dark --title "Research Report"
+
+# Batch convert a folder of mixed documents
+mineru-html batch input/ -o output/html_reports/
+```
+
+### Python API Usage
+```python
+from mineru_html_converter import MinerUHTMLConverter, HTMLConversionConfig
+
+converter = MinerUHTMLConverter(
+    config=HTMLConversionConfig(theme="modern", embed_images=True, add_toc=True)
+)
+result = converter.convert("document.pdf", "output/document.html")
+print(f"Generated: {result.output_html_file} ({result.embedded_images_count} images embedded)")
+```
+
+---
+
+## 🛡️ Markdown PII Redactor (`markdown-redact`)
+
+A dedicated CLI and Python library that detects Personally Identifiable Information (**PII**) in Markdown files and replaces sensitive tokens with **masked stars (`*`)** using **Microsoft Presidio**.
+
+### Features
+- **Presidio Privacy Anonymization**: Recognizes Person names, Email addresses, Phone numbers, Locations, Street addresses, SSNs, Credit card numbers, and IP addresses.
+- **Asterisk Star Masking**: Replaces sensitive data with exact-length asterisk characters (`*`), preserving formatting structure.
+- **Markdown Preservation**:
+  - Automatically isolates and protects code blocks (`` ``` ``) and inline code (`` `...` ``) from false-positive entity redaction.
+  - Automatically protects Markdown image syntax (`![alt](url)`) and URL references.
+- **Custom Street Address Engine**: Built-in pattern recognizer for residential and commercial street addresses.
+- **Rich Terminal UI**: Displays interactive summary tables, processing speeds, and breakdown of redacted entity categories.
+- **Single & Batch Mode**: Redact individual `.md` files or recursively sanitize entire documentation trees.
+
+### CLI Usage
+```bash
+# Redact a single markdown file (saves to <filename>.redacted.md by default)
+markdown-redact redact output/document.md
+
+# Specify custom output path
+markdown-redact redact output/document.md -o output/sanitized.md
+
+# Redact with a custom confidence threshold (0.0 - 1.0)
+markdown-redact redact output/document.md -t 0.5
+
+# Redact specific entities only
+markdown-redact redact output/document.md -e PERSON -e EMAIL_ADDRESS -e PHONE_NUMBER
+
+# Batch redact all markdown files within a folder
+markdown-redact batch output/results -o output/redacted_results
+
+# List all supported PII entity types
+markdown-redact entities
+
+# Run via module invocation
+python -m markdown_redactor redact output/document.md
+```
+
+### Python API Usage
+```python
+from markdown_redactor import MarkdownRedactor, RedactionConfig
+
+# Initialize redactor
+config = RedactionConfig(score_threshold=0.4, mask_char="*")
+redactor = MarkdownRedactor(config=config)
+
+# Redact string content
+text = "Contact Alice at alice@example.com or 555-0199 in Boston."
+redacted, findings, counts = redactor.redact_text(text)
+print(redacted)
+# Output: Contact ***** at ***************** or ******** in ******.
+
+# Redact file
+result = redactor.redact_file("input.md", "output.md")
+print(f"Redacted {result.findings_count} entities in {result.execution_time:.2f}s")
+```
+
+---
+
 ## 🧪 Running Tests
 
 Run the test suite:
 ```bash
-python -m unittest tests/test_converter.py
+pytest tests/ -v
 ```
+
 

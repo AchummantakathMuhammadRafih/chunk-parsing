@@ -22,6 +22,10 @@ setup(
             "mineru-converter=mineru_converter.cli.app:cli",
             "media-transcribe=media_transcriber.cli.app:cli",
             "media-transcriber=media_transcriber.cli.app:cli",
+            "mineru-html=mineru_html_converter.cli.app:cli",
+            "mineru-to-html=mineru_html_converter.cli.app:cli",
+            "markdown-redact=markdown_redactor.cli.app:cli",
+            "markdown-redactor=markdown_redactor.cli.app:cli",
         ],
     },
     classifiers=[
