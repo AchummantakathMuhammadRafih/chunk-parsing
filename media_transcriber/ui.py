@@ -122,7 +122,7 @@ def worker_loop():
                 JOBS[job_id]["completed_at"] = datetime.now().strftime("%H:%M:%S")
                 JOBS[job_id]["detected_language"] = result.language
                 JOBS[job_id]["duration"] = format_timestamp_short(result.duration_seconds or 0.0)
-                JOBS[job_id]["raw_text"] = result.full_text
+                JOBS[job_id]["raw_text"] = result.text
                 JOBS[job_id]["timestamped_text"] = formatted_txt
                 JOBS[job_id]["device_used"] = getattr(transcriber, "device", device)
                 JOBS[job_id]["download_files"] = [
