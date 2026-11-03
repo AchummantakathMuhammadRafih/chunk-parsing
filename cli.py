@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-"""Direct entrypoint for the MinerU Converter CLI."""
+"""Direct entrypoint for the Media Transcriber CLI."""
 
-import sys
-from mineru_converter.cli.app import cli
+from media_transcriber.cli.app import cli
 
 if __name__ == "__main__":
     cli()

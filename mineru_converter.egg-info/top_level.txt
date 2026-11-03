@@ -1,4 +1,0 @@
-markdown_redactor
-media_transcriber
-mineru_converter
-mineru_html_converter
