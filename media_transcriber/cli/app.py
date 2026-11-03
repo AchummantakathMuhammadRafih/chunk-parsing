@@ -237,3 +237,30 @@ def batch_cmd(
             failed.append(f.name)
 
     print_batch_summary(results, failed)
+
+
+@cli.command("ui")
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Host address to bind UI server."
+)
+@click.option(
+    "--port",
+    default=7860,
+    show_default=True,
+    type=int,
+    help="Port to run UI on."
+)
+@click.option(
+    "--share",
+    is_flag=True,
+    default=False,
+    help="Generate a public shareable gradio.live URL."
+)
+def ui(host: str, port: int, share: bool):
+    """Launch the Web UI for uploading files and background processing."""
+    from media_transcriber.ui import launch
+    console.print(f"[bold green]Starting Media Transcriber Studio UI at http://{host}:{port}...[/bold green]")
+    launch(host=host, port=port, share=share)

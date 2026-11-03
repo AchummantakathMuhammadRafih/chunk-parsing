@@ -30,6 +30,20 @@ Dependencies:
 - `rich`
 - `pydantic`
 - `torch`
+- `gradio`
+
+---
+
+## Web UI (Studio)
+
+Launch the interactive Web UI with file uploads, model picker, and background queue processing:
+
+`ash
+media-transcriber ui
+# or
+python -m media_transcriber.ui
+`
+Then open http://127.0.0.1:7860 in your browser.
 
 ---
 
