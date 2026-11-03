@@ -1,4 +1,4 @@
-"""Web UI for Media Transcriber with file upload, model selection, and background thread processing."""
+"""Web UI for Media Transcriber with file upload, model selection, device (GPU/CPU) selection, and background thread processing."""
 
 import os
 import shutil
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 import gradio as gr
+import torch
 
 from media_transcriber.core.transcriber import MediaTranscriber
 from media_transcriber.exporters.writers import TranscriptionWriter
@@ -44,6 +45,19 @@ MODEL_OPTIONS = [
 ]
 
 
+def detect_device_info() -> Dict[str, Any]:
+    """Detect GPU / CUDA status and details."""
+    has_cuda = torch.cuda.is_available()
+    device_name = torch.cuda.get_device_name(0) if has_cuda else "CPU"
+    device_count = torch.cuda.device_count() if has_cuda else 0
+    return {
+        "has_cuda": has_cuda,
+        "device_name": device_name,
+        "device_count": device_count,
+        "default_device": "cuda" if has_cuda else "cpu",
+    }
+
+
 def get_cached_transcriber(model_name: str, device: str = "auto") -> MediaTranscriber:
     """Load or retrieve Whisper model instance cached in memory."""
     key = f"{model_name}_{device}"
@@ -63,6 +77,7 @@ def worker_loop():
         job_id = task["job_id"]
         file_path = task["file_path"]
         model_name = task["model_name"]
+        device = task.get("device", "auto")
         language = task["language"]
         task_mode = task["task_mode"]
         word_timestamps = task["word_timestamps"]
@@ -73,7 +88,7 @@ def worker_loop():
             JOBS[job_id]["started_at"] = datetime.now().strftime("%H:%M:%S")
 
         try:
-            transcriber = get_cached_transcriber(model_name=model_name)
+            transcriber = get_cached_transcriber(model_name=model_name, device=device)
             result = transcriber.transcribe(
                 file_path=file_path,
                 language=language if language and language.strip() else None,
@@ -109,6 +124,7 @@ def worker_loop():
                 JOBS[job_id]["duration"] = format_timestamp_short(result.duration_seconds or 0.0)
                 JOBS[job_id]["raw_text"] = result.full_text
                 JOBS[job_id]["timestamped_text"] = formatted_txt
+                JOBS[job_id]["device_used"] = getattr(transcriber, "device", device)
                 JOBS[job_id]["download_files"] = [
                     str(txt_path),
                     str(raw_txt_path),
@@ -134,6 +150,7 @@ WORKER_THREAD.start()
 def submit_transcription_jobs(
     files: List[Any],
     model_name: str,
+    device_choice: str,
     language: str,
     task_mode: str,
     word_timestamps: bool,
@@ -158,6 +175,7 @@ def submit_transcription_jobs(
                 "file_name": file_path_src.name,
                 "file_path": saved_file_path,
                 "model_name": model_name,
+                "device": device_choice,
                 "status": "Queued",
                 "submitted_at": datetime.now().strftime("%H:%M:%S"),
                 "started_at": "-",
@@ -174,6 +192,7 @@ def submit_transcription_jobs(
             "job_id": job_id,
             "file_path": saved_file_path,
             "model_name": model_name,
+            "device": device_choice,
             "language": language,
             "task_mode": task_mode,
             "word_timestamps": word_timestamps,
@@ -198,12 +217,15 @@ def get_job_table_data():
             elif info["status"] == "Queued":
                 status_display = "🕒 Queued"
             elif info["status"] == "Failed":
-                status_display = f"❌ Failed"
+                status_display = "❌ Failed"
+
+            dev_disp = info.get("device_used", info.get("device", "auto")).upper()
 
             rows.append([
                 info["job_id"],
                 info["file_name"],
                 info["model_name"],
+                dev_disp,
                 status_display,
                 info.get("detected_language", "-"),
                 info.get("duration", "-"),
@@ -244,16 +266,25 @@ def view_job_details(selected_choice: Optional[str]):
 
 def create_app() -> gr.Blocks:
     """Constructs and returns the Gradio application."""
+    dev_info = detect_device_info()
+    has_gpu = dev_info["has_cuda"]
+    device_banner = (
+        f"⚡ **GPU Acceleration Active:** `{dev_info['device_name']}` ({dev_info['device_count']} GPU found)"
+        if has_gpu
+        else "💻 **Hardware Info:** Running on CPU (No CUDA GPU detected on current host)"
+    )
+
     custom_css = """
     .gradio-container { max-width: 1200px !important; margin: 0 auto !important; }
-    .status-badge { font-weight: bold; }
     """
 
     with gr.Blocks(title="Media Transcriber Studio", css=custom_css, theme=gr.themes.Soft()) as demo:
         gr.Markdown(
-            """
+            f"""
             # 🎙️ Media Transcriber Studio
-            ### Upload audio & video files for asynchronous speech-to-text processing powered by OpenAI Whisper.
+            ### High-speed speech-to-text with Whisper & background thread queuing.
+            
+            > {device_banner}
             """
         )
 
@@ -267,25 +298,36 @@ def create_app() -> gr.Blocks:
                     file_types=["audio", "video", ".mp3", ".mp4", ".wav", ".m4a", ".mkv", ".webm", ".flac", ".ogg"],
                 )
 
-                gr.Markdown("### 2. Whisper Model Selection")
+                gr.Markdown("### 2. Model & Acceleration")
                 model_dropdown = gr.Dropdown(
                     label="Model Size",
                     choices=[opt[1] for opt in MODEL_OPTIONS],
                     value="base",
-                    info="Choose tiny/base for speed or small/medium/large for high accuracy.",
+                    info="tiny/base for speed; small/medium/large for highest accuracy.",
+                )
+
+                device_radio = gr.Radio(
+                    label="Compute Device (GPU Acceleration)",
+                    choices=[
+                        ("Auto-detect (Prefers CUDA GPU if available)", "auto"),
+                        ("NVIDIA CUDA (GPU)", "cuda"),
+                        ("CPU", "cpu"),
+                    ],
+                    value="cuda" if has_gpu else "auto",
+                    info="Select 'cuda' for GPU acceleration if an NVIDIA card is available."
                 )
 
                 with gr.Accordion("Model Details & Specifications", open=False):
                     gr.Markdown(
                         """
-                        | Model | Parameters | Relative Speed | VRAM Required | English-only | Multilingual |
-                        |---|---|---|---|---|---|
-                        | **tiny** | 39 M | ~32x | ~1 GB | Yes | Yes |
-                        | **base** | 74 M | ~16x | ~1 GB | Yes | Yes (Default) |
-                        | **small** | 244 M | ~6x | ~2 GB | Yes | Yes |
-                        | **medium** | 769 M | ~2x | ~5 GB | Yes | Yes |
-                        | **large** | 1550 M | 1x | ~10 GB | N/A | Yes |
-                        | **large-v3**| 1550 M | 1x | ~10 GB | N/A | Yes (Latest) |
+                        | Model | Parameters | Relative Speed | VRAM Required | Speedup on GPU |
+                        |---|---|---|---|---|
+                        | **tiny** | 39 M | ~32x | ~1 GB | ~10-20x vs CPU |
+                        | **base** | 74 M | ~16x | ~1 GB | ~10-20x vs CPU |
+                        | **small** | 244 M | ~6x | ~2 GB | ~15-25x vs CPU |
+                        | **medium** | 769 M | ~2x | ~5 GB | ~20-30x vs CPU |
+                        | **large** | 1550 M | 1x | ~10 GB | ~25-40x vs CPU |
+                        | **large-v3**| 1550 M | 1x | ~10 GB | ~25-40x vs CPU |
                         """
                     )
 
@@ -319,8 +361,8 @@ def create_app() -> gr.Blocks:
                     refresh_btn = gr.Button("🔄 Refresh Status", size="sm")
 
                 job_table = gr.Dataframe(
-                    headers=["Job ID", "File Name", "Model", "Status", "Lang", "Duration", "Queued At", "Done At"],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
+                    headers=["Job ID", "File Name", "Model", "Device", "Status", "Lang", "Duration", "Queued At", "Done At"],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
                     value=get_job_table_data,
                     interactive=False,
                 )
@@ -364,6 +406,7 @@ def create_app() -> gr.Blocks:
             inputs=[
                 file_input,
                 model_dropdown,
+                device_radio,
                 lang_input,
                 task_radio,
                 word_timestamps_check,
@@ -387,7 +430,7 @@ def create_app() -> gr.Blocks:
             outputs=[timestamped_output, raw_output, file_downloads, error_display],
         )
 
-        # Automatic periodic refresh every 3 seconds for active queue
+        # Automatic periodic refresh every 3 seconds
         timer = gr.Timer(value=3.0)
         timer.tick(
             fn=on_refresh,
